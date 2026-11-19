@@ -15,7 +15,7 @@ Built by **Mohammed Abdul Moid** as part of a technical assessment. Contact: 10a
 - **Scope toggle.** Search **All**, **DarGlobal** only, or **Wasalt** only.
 - **English and Arabic.** One click switches the whole interface to right-to-left Arabic.
   - Arabic questions are translated to English for the search step, then answered in Arabic.
-  - An Arabic keyword map keeps search working if that translation fails.
+  - An Arabic keyword map keeps search working if that translation failss.
 - **Guardrails** in the system prompt:
   - no investment, legal or financial advice
   - no personal data beyond a person's public role
