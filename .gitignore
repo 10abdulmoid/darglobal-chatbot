@@ -1,0 +1,7 @@
+
+.venv/
+.env
+data/raw_html/
+data/raw_html_rendered/
+data/raw_html_wasalt/
+*.bak
