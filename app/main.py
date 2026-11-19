@@ -4,7 +4,8 @@ DarGlobal & Wasalt property assistant: FastAPI app serving a chat UI and a RAG A
     GET  /            chat page
     POST /api/chat    {"messages": [{"role": "user"|"assistant", "content": "..."}],
                        "company": "all"|"darglobal"|"wasalt", "lang": "en"|"ar"  (both optional)}
-                      -> {"answer", "sources": [{"n","title","url","source"}], "model"}
+                      -> {"answer", "sources": [{"n","title","url","source"}], "model",
+                          "timing": {"retrieval_ms", "llm_ms", "total_ms", "cached"}}
     GET  /health      status, number of chunks, models in use, answer-cache size
 
 First questions (no chat history) are cached in memory for 24h, so repeats skip the LLM. No database.
@@ -163,6 +164,9 @@ def health():
 
 @app.post("/api/chat")
 def chat(body: ChatIn):
+    t0 = time.perf_counter()
+    ms = lambda a, b: round((b - a) * 1000)  # noqa: E731
+    timing = lambda r, l, cached=False: {"retrieval_ms": r, "llm_ms": l, "total_ms": ms(t0, time.perf_counter()), "cached": cached}  # noqa: E731
     msgs = [m for m in body.messages if m.role in ("user", "assistant") and m.content.strip()]
     if not msgs or msgs[-1].role != "user":
         return JSONResponse({"error": "The last message must be from the user."}, status_code=400)
@@ -174,14 +178,16 @@ def chat(body: ChatIn):
 
     arabic = body.lang == "ar" or bool(ARABIC.search(question))
     if INTRO.search(question):  # fixed reply: free models don't reliably follow the intro rule
-        return {"answer": INTRO_ANSWER_AR if arabic else INTRO_ANSWER, "sources": [], "model": None}
+        return {"answer": INTRO_ANSWER_AR if arabic else INTRO_ANSWER, "sources": [], "model": None,
+                "timing": timing(0, 0)}
 
     # only standalone questions are cached: follow-ups depend on the earlier messages
     key = (" ".join(question.lower().split()), body.company, body.lang) if len(msgs) == 1 else None
     if key and (hit := cache_get(key)):
         log.info("cache hit: %s", key[0][:60])
-        return hit
+        return {**hit, "timing": timing(0, 0, cached=True)}
 
+    t_ret = time.perf_counter()
     if SMALLTALK.match(question):
         docs, company = [], "both"
     else:
@@ -189,6 +195,7 @@ def chat(body: ChatIn):
         if ARABIC.search(query):
             query = f"{to_english(query)} {query}"  # English for BM25, original kept for the few Arabic pages
         docs, company = index.search(query, k=6, company=body.company)
+    retrieval_ms = ms(t_ret, time.perf_counter())  # includes the Arabic->English translation call, if any
     context = build_context(docs) if docs else "(no relevant documents found)"
 
     convo = [{"role": "system", "content": SYSTEM}]
@@ -197,12 +204,14 @@ def chat(body: ChatIn):
     reply_lang = "\n\nReply in Arabic." if body.lang == "ar" else ""
     convo.append({"role": "user", "content": f"CONTEXT:\n{context}\n\nQUESTION: {question}{reply_lang}"})
 
+    t_llm = time.perf_counter()
     try:
         answer, model = llm.chat(convo)
     except llm.LLMError as e:
         log.error("LLM failure: %s", e)
-        return JSONResponse({"answer": BUSY["ar" if arabic else "en"], "sources": [], "model": None, "error": True},
-                            status_code=503)
+        return JSONResponse({"answer": BUSY["ar" if arabic else "en"], "sources": [], "model": None, "error": True,
+                             "timing": timing(retrieval_ms, ms(t_llm, time.perf_counter()))}, status_code=503)
+    llm_ms = ms(t_llm, time.perf_counter())
 
     # only return the sources the answer actually cites (fall back to all retrieved)
     cited = {int(n) for n in re.findall(r"\[(\d+)\]", answer)}
@@ -211,7 +220,7 @@ def chat(body: ChatIn):
     result = {"answer": answer, "sources": sources, "model": model}
     if key:
         cache_put(key, result)
-    return result
+    return {**result, "timing": timing(retrieval_ms, llm_ms)}
 
 
 if __name__ == "__main__":
