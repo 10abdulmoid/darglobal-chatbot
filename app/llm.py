@@ -83,7 +83,7 @@ def _merge_system(messages):
     return rest
 
 
-def chat(messages, max_tokens=700, temperature=0.2):
+def chat(messages, max_tokens=2000, temperature=0.2):
     """Returns (answer_text, model_used). Raises LLMError if every model fails."""
     if not KEY:
         raise LLMError("OPENROUTER_API_KEY is not set on the server.")
@@ -101,6 +101,7 @@ def chat(messages, max_tokens=700, temperature=0.2):
                 r = httpx.post(f"{API}/chat/completions", headers=headers, timeout=60, json={
                     "model": model, "messages": msgs,
                     "max_tokens": max_tokens, "temperature": temperature,
+                    "reasoning": {"exclude": True},
                 })
             except httpx.HTTPError as e:
                 errors.append(f"{model}: {type(e).__name__}")
