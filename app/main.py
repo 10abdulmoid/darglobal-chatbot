@@ -156,6 +156,11 @@ def home():
     return FileResponse(STATIC / "index.html")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():  # browsers probe this path even when the page declares its own icon
+    return FileResponse(STATIC / "favicon-64.png", media_type="image/png")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "chunks": len(index.docs), "sources": index.sources,
