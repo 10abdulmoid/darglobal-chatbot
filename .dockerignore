@@ -1,0 +1,12 @@
+.venv/
+**/.venv/
+.env
+.git/
+__pycache__/
+**/__pycache__/
+data/raw/
+data/raw_html/
+data/raw_html_rendered/
+data/raw_html_wasalt/
+scraper/
+*.bak

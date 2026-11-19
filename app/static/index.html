@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DarGlobal AI chatbot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Cormorant+Garamond:ital,wght@0,500;1,500&family=Manrope:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f5f0; --panel: #ffffff; --ink: #1c1a17; --muted: #6e685e; --line: #e3ded4; --line-strong: #cfc7b8;
+    --accent: #6b5e43; --accent-ink: #ffffff; --limestone: #ede6da; --ws: #6b3fa0; --err: #9b2c2c;
+    --shadow: 0 8px 28px rgba(60, 45, 20, .08), 0 1px 2px rgba(60, 45, 20, .06);
+    --serif: "Cormorant Garamond", "Cormorant", Garamond, "Times New Roman", serif;
+    --label: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --sans: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --col: 760px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1816; --panel: #23201d; --ink: #eee9e0; --muted: #a9a196; --line: #38332d; --line-strong: #4d463d;
+      --accent: #c2a97a; --accent-ink: #1a1816; --limestone: #3a332a; --ws: #b996e6; --err: #f19b9b;
+      --shadow: 0 8px 28px rgba(0, 0, 0, .35);
+      color-scheme: dark;
+    }
+  }
+  /* Arabic: Arabic faces, no letter-spacing (it breaks letter joining), roomier line-height */
+  :root[lang="ar"] {
+    --serif: "Noto Naskh Arabic", "Cormorant Garamond", serif;
+    --label: "IBM Plex Sans Arabic", "Archivo", sans-serif;
+    --sans: "IBM Plex Sans Arabic", "Manrope", system-ui, sans-serif;
+  }
+  :root[lang="ar"] body * { letter-spacing: 0 !important; }
+  :root[lang="ar"] .start h1 { line-height: 1.35; }
+  :root[lang="ar"] .answer p.lead { line-height: 1.6; font-size: 21px; }
+  :root[lang="ar"] .status { font-style: normal; font-size: 18px; }
+  :root[lang="ar"] .fine, :root[lang="ar"] .scope button, :root[lang="ar"] .eyebrow { font-size: 12px; }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }  /* the hidden attribute must win over display:flex rules */
+  html, body { height: 100%; margin: 0; }
+  body { height: 100dvh; display: flex; flex-direction: column; background: var(--bg); color: var(--ink);
+         font: 15px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* header */
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+           padding: calc(14px + env(safe-area-inset-top, 0px)) 20px 12px; }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; color: inherit; text-decoration: none; border-radius: 4px; }
+  .brand .logo { display: block; height: 40px; width: auto; filter: drop-shadow(0 1px 1px rgba(40, 30, 10, .18)); }
+  .brand .divider { width: 1px; height: 26px; background: var(--line-strong); }
+  .brand .b2 { font: 700 9.5px/1.2 "Archivo", sans-serif; text-transform: uppercase; letter-spacing: .24em; color: var(--muted); white-space: nowrap; }
+  .actions { display: flex; gap: 8px; }
+  .newchat, .langbtn, .recentbtn { font: 700 11px/1 var(--label); text-transform: uppercase; letter-spacing: .02em; padding: 10px 14px;
+                       background: transparent; border: 1px solid var(--accent); color: var(--ink); cursor: pointer; white-space: nowrap; }
+  .newchat:hover { background: var(--accent); color: var(--accent-ink); }
+  .langbtn, .recentbtn { border-color: var(--line-strong); }
+  .langbtn:hover, .recentbtn:hover { border-color: var(--accent); }
+  .langbtn:lang(ar) { font-family: "IBM Plex Sans Arabic", sans-serif; font-size: 13px; padding-block: 8px; letter-spacing: 0; }
+
+  /* scroll area */
+  main { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: 0 16px; }
+  .start { margin: auto; width: 100%; max-width: 620px; text-align: center; padding: 24px 0 40px; }
+  .eyebrow { font: 700 11px/1.3 var(--label); text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin: 0 0 14px; }
+  .start h1 { font: 500 clamp(32px, 6vw, 44px)/1.02 var(--serif); text-transform: uppercase; letter-spacing: -.01em; margin: 0 0 28px; }
+  .slot { width: 100%; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 14px 0 16px; }
+  .chip { display: inline-flex; align-items: baseline; gap: 8px; padding: 8px 12px; background: var(--panel);
+          border: 1px solid var(--line); border-radius: 10px; cursor: pointer; text-align: start; font: 500 13.5px/1.3 var(--sans); }
+  .chip:hover { border-color: var(--accent); }
+  .fine { font: 600 10px/1.5 var(--label); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0; text-align: center; }
+  .credit { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
+  .credit:hover { color: var(--ink); }
+
+  /* tags (chips, sources) */
+  .tag { font: 700 9.5px/1 var(--label); text-transform: uppercase; letter-spacing: .08em; color: var(--accent); white-space: nowrap; }
+  .tag.wasalt { color: var(--ws); }
+
+  /* composer: one element, moves from the start screen to the dock */
+  .composer { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow);
+              padding-block: 12px 10px; padding-inline: 14px 12px; text-align: start; }
+  .composer:focus-within { border-color: var(--accent); }
+  .composer textarea { display: block; width: 100%; resize: none; border: 0; outline: 0; background: transparent; color: var(--ink);
+                       font: 400 15px/1.5 var(--sans); padding: 2px 0 10px; max-height: 160px; min-height: 48px; }
+  .composer textarea::placeholder { color: var(--muted); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .scope { display: flex; gap: 6px; flex-wrap: wrap; }
+  .scope button { font: 700 10px/1 var(--label); text-transform: uppercase; letter-spacing: .08em; padding: 7px 9px;
+                  background: transparent; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); cursor: pointer; }
+  .scope button[aria-pressed="true"] { background: var(--limestone); border-color: var(--line-strong); color: var(--ink); }
+  .send { flex: none; width: 36px; height: 36px; border: 0; border-radius: 10px; background: var(--accent); color: var(--accent-ink);
+          font: 600 16px/1 var(--sans); cursor: pointer; }
+  .send:disabled { opacity: .45; cursor: default; }
+
+  /* conversation */
+  .log { width: 100%; max-width: var(--col); margin: 0 auto; padding: 20px 0 24px; }
+  .msg { margin: 0 0 22px; }
+  .msg.user { display: flex; justify-content: flex-end; }
+  .msg.user .bubble { max-width: min(560px, 85%); background: var(--limestone); border-radius: 14px; padding: 10px 16px;
+                      font: 500 14.5px/1.55 var(--sans); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .answer { max-width: 680px; overflow-wrap: anywhere; }
+  .answer.typing-out { cursor: pointer; }
+  .answer.err { color: var(--err); }
+  .answer p { margin: 0 0 10px; }
+  .answer p.lead { font: 500 23px/1.25 var(--serif); letter-spacing: -.005em; margin: 0 0 12px; }
+  .answer ul, .answer ol { margin: 4px 0 10px; padding-inline-start: 20px; }
+  .answer li { margin: 3px 0; }
+  .answer li::marker { color: var(--accent); }
+  .answer strong { font-weight: 600; }
+  .answer sup { line-height: 0; }
+  .answer sup a { color: var(--accent); text-decoration: none; font: 600 10.5px "Archivo", sans-serif; }
+  .answer sup a:hover { text-decoration: underline; }
+  .sources { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .src { display: inline-flex; align-items: baseline; gap: 8px; max-width: 100%; padding: 7px 12px; background: var(--panel);
+         border: 1px solid var(--line); border-radius: 10px; color: var(--ink); text-decoration: none; font: 500 12.5px/1.35 var(--sans); }
+  .src:hover { border-color: var(--accent); }
+  .src .n { font: 700 11px/1 "Archivo", sans-serif; color: var(--ink); }
+  .src .t { min-width: 0; overflow-wrap: anywhere; }
+  .model { color: var(--muted); font: 600 9.5px/1 var(--label); text-transform: uppercase; letter-spacing: .06em; margin-top: 12px; }
+  .status { display: flex; align-items: center; gap: 12px; color: var(--muted); font: italic 500 20px/1.3 var(--serif); }
+  .status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: pulse 1.4s ease-in-out infinite; }
+  .status .word { transition: opacity .25s ease; }
+  .status .word.fade { opacity: 0; }
+  @keyframes pulse { 0%, 100% { opacity: .3; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.15); } }
+
+  /* dock */
+  .dock { padding: 6px 16px calc(10px + env(safe-area-inset-bottom, 0px)); background: var(--bg); }
+  .dock .slot { max-width: var(--col); margin: 0 auto; }
+  .dock .fine { margin-top: 8px; }
+  .fine .short { display: none; }
+
+  /* recent chats drawer (saved in this browser only) */
+  .backdrop { position: fixed; inset: 0; background: rgba(20, 15, 8, .38); z-index: 10; }
+  .drawer { position: fixed; top: 0; bottom: 0; inset-inline-end: 0; z-index: 11; width: min(360px, 88vw);
+            display: flex; flex-direction: column; background: var(--panel); border-inline-start: 1px solid var(--line);
+            box-shadow: var(--shadow); padding: calc(16px + env(safe-area-inset-top, 0px)) 0 calc(14px + env(safe-area-inset-bottom, 0px)); }
+  .drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 18px 12px; border-bottom: 1px solid var(--line); }
+  .drawer-head h2 { margin: 0; font: 700 11px/1.2 var(--label); text-transform: uppercase; letter-spacing: .08em; }
+  .iconbtn { width: 32px; height: 32px; flex: none; border: 1px solid var(--line); border-radius: 8px; background: transparent;
+             color: var(--muted); cursor: pointer; font: 500 18px/1 var(--sans); }
+  .iconbtn:hover { color: var(--ink); border-color: var(--accent); }
+  .drawer ul { list-style: none; margin: 0; padding: 8px 10px; overflow-y: auto; flex: 1; }
+  .drawer li { display: flex; align-items: center; gap: 6px; border-radius: 10px; }
+  .drawer li.current { background: var(--limestone); }
+  .drawer .open { flex: 1; min-width: 0; text-align: start; background: transparent; border: 0; border-radius: 10px;
+                  padding: 9px 10px; cursor: pointer; }
+  .drawer .open:hover { background: var(--bg); }
+  .drawer li.current .open:hover { background: transparent; }
+  .drawer .title { display: block; font: 500 13.5px/1.35 var(--sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .drawer .when { display: block; font: 600 9.5px/1.4 var(--label); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-top: 3px; }
+  .drawer .del { width: 28px; height: 28px; font-size: 16px; border-color: transparent; margin-inline-end: 4px; }
+  .drawer .empty { color: var(--muted); font: 500 13.5px/1.5 var(--sans); padding: 18px; margin: 0; }
+  .drawer-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 18px 0; border-top: 1px solid var(--line); }
+  .drawer-foot .note { font: 600 9.5px/1.4 var(--label); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .clearall { font: 700 10px/1 var(--label); text-transform: uppercase; letter-spacing: .06em; padding: 8px 10px; background: transparent;
+              border: 1px solid var(--line-strong); color: var(--ink); cursor: pointer; white-space: nowrap; }
+  .clearall[data-confirm] { border-color: var(--err); color: var(--err); }
+  .clearall:disabled { opacity: .45; cursor: default; }
+
+  @media (max-width: 480px) {
+    header { padding-inline: 16px; }
+    .brand { gap: 9px; } .brand .logo { height: 26px; } .brand .divider { height: 20px; }
+    .brand .divider, .brand .b2 { display: none; }
+    .actions { gap: 6px; }
+    .newchat, .langbtn, .recentbtn { padding-inline: 9px; }
+    /* phones: chips become a full-width list matching the composer, tags in an aligned column */
+    .chips { display: grid; grid-template-columns: 1fr; gap: 6px; margin: 12px 0 16px; }
+    .chip { display: grid; grid-template-columns: 74px 1fr auto; align-items: center; gap: 10px; width: 100%;
+            padding: 11px 14px; border-radius: 12px; }
+    .chip::after { content: "→"; color: var(--muted); font: 500 14px/1 var(--sans); }
+    :root[dir="rtl"] .chip::after { content: "←"; }
+    .chip:hover::after { color: var(--accent); }
+    .fine .long { display: none; } .fine .short { display: inline; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .status .word { transition: none; }
+    .status .dot { animation: none; opacity: .8; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="/" id="home" aria-label="DarGlobal AI chatbot – home">
+    <img class="logo" src="/static/darglobal-logo.png" alt="DarGlobal" width="494" height="200">
+    <span class="divider" aria-hidden="true"></span>
+    <span class="b2">AI Chatbot</span>
+  </a>
+  <div class="actions">
+    <button class="langbtn" id="langbtn" type="button" lang="ar" aria-label="التبديل إلى العربية">العربية</button>
+    <button class="recentbtn" id="recentbtn" type="button" aria-haspopup="dialog" aria-controls="drawer" aria-expanded="false" data-i18n="recent">Recent</button>
+    <button class="newchat" id="newchat" type="button" data-i18n="newChat">New chat</button>
+  </div>
+</header>
+
+<main id="chat">
+  <section class="start" id="start">
+    <p class="eyebrow" data-i18n="eyebrow">Global capital. Enduring places.</p>
+    <h1 data-i18n="heading">What would you<br>like to know?</h1>
+    <div class="slot" id="startSlot">
+      <form class="composer" id="composer">
+        <textarea id="q" rows="1" dir="auto" placeholder="Ask about a project, partner, office or listing…" aria-label="Your question"></textarea>
+        <div class="row">
+          <div class="scope" role="group" aria-label="Search scope">
+            <button type="button" data-scope="all" aria-pressed="true" data-i18n="all">All</button>
+            <button type="button" data-scope="darglobal" aria-pressed="false" data-i18n="dg">DarGlobal</button>
+            <button type="button" data-scope="wasalt" aria-pressed="false" data-i18n="ws">Wasalt</button>
+          </div>
+          <button class="send" id="send" type="submit" aria-label="Send">↑</button>
+        </div>
+      </form>
+    </div>
+    <div class="chips" id="chips"></div>
+    <p class="fine"><span data-i18n="fineStart">Unofficial demo · Answers from public data on darglobal.co.uk and wasalt.sa</span>
+      · <a class="credit" href="mailto:10abdulmoid@gmail.com" data-i18n="credit">Made by Abdul Moid</a></p>
+  </section>
+  <div class="log" id="log" hidden></div>
+</main>
+
+<footer class="dock" id="dock" hidden>
+  <div class="slot" id="dockSlot"></div>
+  <p class="fine"><span class="long" data-i18n="fineLong">Knowledge updated as of 19 Nov 2026</span><span class="short" data-i18n="fineShort">Updated 19 Nov 2026</span>
+    · <a class="credit" href="mailto:10abdulmoid@gmail.com" data-i18n="credit">Made by Abdul Moid</a></p>
+</footer>
+
+<div class="backdrop" id="backdrop" hidden></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" hidden>
+  <div class="drawer-head">
+    <h2 id="drawerTitle" data-i18n="recentTitle">Recent chats</h2>
+    <button class="iconbtn" id="drawerClose" type="button" aria-label="Close">×</button>
+  </div>
+  <ul id="chatList"></ul>
+  <div class="drawer-foot">
+    <span class="note" data-i18n="savedNote">Saved in this browser only</span>
+    <button class="clearall" id="clearAll" type="button" data-i18n="clearAll">Clear all</button>
+  </div>
+</aside>
+
+<script>
+// date the knowledge base was scraped -- update this after re-running the scrapers
+const DATA_DATE = "2026-11-19";
+
+const T = {
+  en: {
+    newChat: "New chat", eyebrow: "Global capital. Enduring places.", heading: "What would you<br>like to know?",
+    ask: "Ask about a project, partner, office or listing…", reply: "Reply…", question: "Your question", send: "Send",
+    all: "All", dg: "DarGlobal", ws: "Wasalt", scope: "Search scope",
+    fineStart: "Unofficial demo · Answers from public data on darglobal.co.uk and wasalt.sa",
+    fineLong: "Knowledge updated as of {date}", fineShort: "Updated {date}",
+    credit: "Made by Abdul Moid", model: "Model",
+    errGeneric: "Something went wrong. Please try again.", errNet: "Network error. Please try again.",
+    status: ["Thinking…", "Reading…", "Gathering…", "Elaborating…", "Painting…", "Happening…"],
+    chips: [
+      { co: "darglobal", label: "Brand partnerships", q: "Which luxury brands has DarGlobal partnered with?" },
+      { co: "darglobal", label: "Projects in Oman", q: "What projects does DarGlobal have in Oman?" },
+      { co: "darglobal", label: "Office locations", q: "Where are DarGlobal's offices?" },
+      { co: "wasalt", label: "3-bed apartments in Riyadh", q: "Show me 3-bedroom apartments for sale in Riyadh" },
+      { co: "wasalt", label: "What Wasalt offers", q: "What is Wasalt and what services does it offer?" },
+    ],
+    switchTo: "العربية", switchLang: "ar", switchLabel: "التبديل إلى العربية",
+    recent: "Recent", recentTitle: "Recent chats", savedNote: "Saved in this browser only", clearAll: "Clear all",
+    confirmClear: "Confirm?", empty: "No saved chats yet.", del: "Delete chat", close: "Close", home: "DarGlobal AI chatbot – home",
+  },
+  ar: {
+    newChat: "محادثة جديدة", eyebrow: "رأس مال عالمي. أماكن خالدة.", heading: "ماذا تودّ<br>أن تعرف؟",
+    ask: "اسأل عن مشروع أو شريك أو مكتب أو عقار…", reply: "اكتب ردّك…", question: "سؤالك", send: "إرسال",
+    all: "الكل", dg: "دار جلوبال", ws: "وصلت", scope: "نطاق البحث",
+    fineStart: "عرض تجريبي غير رسمي · إجابات من بيانات عامة على darglobal.co.uk و wasalt.sa",
+    fineLong: "المعلومات محدّثة حتى {date}", fineShort: "محدّثة حتى {date}",
+    credit: "من إعداد Abdul Moid", model: "النموذج",
+    errGeneric: "حدث خطأ ما. يرجى المحاولة مرة أخرى.", errNet: "خطأ في الشبكة. يرجى المحاولة مرة أخرى.",
+    status: ["أفكّر…", "أقرأ…", "أجمع المعلومات…", "أوضّح…", "أصيغ الإجابة…", "لحظات…"],
+    chips: [
+      { co: "darglobal", label: "الشراكات مع العلامات", q: "ما هي العلامات التجارية الفاخرة التي تعاونت معها دار جلوبال؟" },
+      { co: "darglobal", label: "مشاريع في عُمان", q: "ما هي مشاريع دار جلوبال في عُمان؟" },
+      { co: "darglobal", label: "مواقع المكاتب", q: "أين تقع مكاتب دار جلوبال؟" },
+      { co: "wasalt", label: "شقق بثلاث غرف في الرياض", q: "اعرض لي شققًا بثلاث غرف نوم للبيع في الرياض" },
+      { co: "wasalt", label: "خدمات وصلت", q: "ما هي وصلت وما الخدمات التي تقدمها؟" },
+    ],
+    switchTo: "English", switchLang: "en", switchLabel: "Switch to English",
+    recent: "المحادثات", recentTitle: "المحادثات الأخيرة", savedNote: "محفوظة في هذا المتصفح فقط", clearAll: "حذف الكل",
+    confirmClear: "تأكيد؟", empty: "لا توجد محادثات محفوظة بعد.", del: "حذف المحادثة", close: "إغلاق", home: "DarGlobal AI chatbot – الرئيسية",
+  },
+};
+const $ = id => document.getElementById(id);
+const chat = $("chat"), log = $("log"), start = $("start"), dock = $("dock");
+const composer = $("composer"), q = $("q"), send = $("send");
+const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+let turns = [], chatId = null, scope = "all", busy = false, session = 0, controller = null;  // turns: what is needed to redraw a chat
+let lang = "en";
+try { if (localStorage.getItem("lang") === "ar") lang = "ar"; } catch (e) {}
+const t = k => T[lang][k];
+const companyName = src => src === "wasalt" ? t("ws") : t("dg");
+const docked = () => composer.parentElement.id === "dockSlot";
+
+function buildChips() {
+  const box = $("chips"); box.innerHTML = "";
+  t("chips").forEach(s => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip";
+    b.innerHTML = `<span class="tag ${s.co}">${companyName(s.co)}</span><span>${s.label}</span>`;
+    b.onclick = () => ask(s.q); box.appendChild(b);
+  });
+}
+
+function applyLang() {
+  const root = document.documentElement;
+  root.lang = lang; root.dir = lang === "ar" ? "rtl" : "ltr";
+  const date = new Date(DATA_DATE + "T12:00:00").toLocaleDateString(lang === "ar" ? "ar-u-nu-latn" : "en-GB",
+                                                                  { day: "numeric", month: "short", year: "numeric" });
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.innerHTML = String(t(el.dataset.i18n)).replace("{date}", date); });  // trusted strings from T
+  q.placeholder = docked() ? t("reply") : t("ask");
+  q.setAttribute("aria-label", t("question")); send.setAttribute("aria-label", t("send"));
+  document.querySelector(".scope").setAttribute("aria-label", t("scope"));
+  const lb = $("langbtn"); lb.textContent = t("switchTo"); lb.lang = t("switchLang"); lb.setAttribute("aria-label", t("switchLabel"));
+  $("home").setAttribute("aria-label", t("home")); $("drawerClose").setAttribute("aria-label", t("close"));
+  buildChips();
+  if (!$("drawer").hidden) renderList();
+}
+
+$("langbtn").onclick = () => {
+  lang = lang === "ar" ? "en" : "ar";
+  try { localStorage.setItem("lang", lang); } catch (e) {}
+  applyLang();
+};
+
+document.querySelectorAll(".scope button").forEach(b => b.onclick = () => {
+  scope = b.dataset.scope;
+  document.querySelectorAll(".scope button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+});
+
+function esc(s) { return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function md(text, sources) {
+  const urls = Object.fromEntries((sources || []).map(s => [s.n, s.url]));
+  const inline = s => esc(s)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+    .replace(/\[(\d+)\]/g, (m, n) => urls[n]
+      ? `<sup><a href="${esc(urls[n])}" target="_blank" rel="noopener">[${n}]</a></sup>` : `<sup>[${n}]</sup>`);
+  const out = []; let list = null;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    const ul = line.match(/^[-*•]\s+(.*)/), ol = line.match(/^\d+[.)]\s+(.*)/);
+    if (ul || ol) {
+      const kind = ul ? "ul" : "ol";
+      if (list !== kind) { if (list) out.push(`</${list}>`); out.push(`<${kind}>`); list = kind; }
+      out.push(`<li>${inline((ul || ol)[1])}</li>`);
+    } else {
+      if (list) { out.push(`</${list}>`); list = null; }
+      if (line) out.push(`<p>${inline(line.replace(/^#+\s*/, ""))}</p>`);
+    }
+  }
+  if (list) out.push(`</${list}>`);
+  return out.join("");
+}
+
+// first line of the full answer is a short plain sentence -> serif lead style (decided once, so it doesn't flip mid-typing)
+function hasLead(text) {
+  const first = text.trim().split("\n")[0].trim();
+  return !!first && !/^([-*•]|\d+[.)])\s/.test(first) && first.replace(/\*\*|\[\d+\]/g, "").length < 140;
+}
+
+function render(el, bodyHtml, lead, tail = "") {
+  el.innerHTML = bodyHtml + tail;
+  if (lead && el.firstElementChild?.tagName === "P") el.firstElementChild.classList.add("lead");
+}
+
+const scrollDown = () => { chat.scrollTop = chat.scrollHeight; };
+
+function add(role) {
+  const row = document.createElement("div"); row.className = `msg ${role}`;
+  const b = document.createElement("div"); b.className = role === "user" ? "bubble" : "answer";
+  b.dir = "auto";  // Arabic answers read right-to-left even in the English UI
+  row.appendChild(b); log.appendChild(row); scrollDown();
+  return b;
+}
+
+// move the ONE composer element between the start screen and the dock (FLIP, ~250ms)
+function placeComposer(target, instant = false) {
+  if (composer.parentElement === target) return;
+  const hadFocus = document.activeElement === q, a = composer.getBoundingClientRect();
+  const toDock = target.id === "dockSlot";
+  start.hidden = toDock; log.hidden = !toDock; dock.hidden = !toDock;
+  target.appendChild(composer);
+  q.placeholder = toDock ? t("reply") : t("ask");
+  if (hadFocus) q.focus({ preventScroll: true });
+  if (instant || reduceMotion() || !composer.animate) return;
+  const b = composer.getBoundingClientRect();
+  composer.animate([
+    { transformOrigin: "top left", transform: `translate(${a.left - b.left}px, ${a.top - b.top}px) scale(${a.width / b.width}, 1)` },
+    { transformOrigin: "top left", transform: "none" },
+  ], { duration: 250, easing: "cubic-bezier(.2, .7, .2, 1)" });
+}
+
+// Cycling status line shown while waiting. Returns a stop() function.
+function showStatus(el) {
+  const words = t("status");
+  el.innerHTML = `<div class="status" role="status"><span class="dot"></span><span class="word">${words[0]}</span></div>`;
+  const w = el.querySelector(".word"); let i = 0;
+  const id = setInterval(() => {
+    w.classList.add("fade");
+    setTimeout(() => { w.textContent = words[++i % words.length]; w.classList.remove("fade"); }, 250);
+  }, 1200);
+  return () => clearInterval(id);
+}
+
+// Reveal text word by word through md(), then append tail (sources/model). Click finishes instantly.
+function typeOut(el, text, sources, tail) {
+  const lead = hasLead(text);
+  const parts = text.split(/(\s+)/);  // words at even indices, whitespace at odd
+  const words = Math.ceil(parts.length / 2);
+  if (reduceMotion() || words < 2) { render(el, md(text, sources), lead, tail); return Promise.resolve(); }
+  const delay = Math.max(16, Math.min(25, 4000 / words));   // ~25ms/word, capped at ~4s total
+  const per = Math.ceil(words * delay / 4000);               // words per tick for long answers
+  return new Promise(resolve => {
+    let shown = 0, id;
+    const finish = () => {
+      clearTimeout(id); el.removeEventListener("click", finish); el.classList.remove("typing-out");
+      render(el, md(text, sources), lead, tail); scrollDown(); resolve();
+    };
+    const tick = () => {
+      shown += per;
+      if (shown >= words || !el.isConnected) return finish();
+      let partial = parts.slice(0, shown * 2 - 1).join("");
+      if ((partial.split("**").length - 1) % 2) {  // half-typed bold: hide the unmatched opener
+        const k = partial.lastIndexOf("**"); partial = partial.slice(0, k) + partial.slice(k + 2);
+      }
+      render(el, md(partial, sources), lead);
+      scrollDown();
+      id = setTimeout(tick, delay);
+    };
+    el.classList.add("typing-out"); el.addEventListener("click", finish);
+    tick();
+  });
+}
+
+function sourcesHtml(sources) {
+  if (!sources?.length) return "";
+  const byUrl = new Map();  // two passages from one page -> one card, "1·2 Title"
+  sources.forEach(s => {
+    if (!byUrl.has(s.url)) byUrl.set(s.url, { ...s, ns: [] });
+    byUrl.get(s.url).ns.push(s.n);
+  });
+  return '<div class="sources">' + [...byUrl.values()].map(s =>
+    `<a class="src" href="${esc(s.url)}" target="_blank" rel="noopener"><span class="n">${s.ns.join("·")}</span>` +
+    `<span class="tag ${s.source}">${companyName(s.source)}</span>` +
+    `<span class="t" dir="auto">${esc(s.title)}</span></a>`).join("") + "</div>";
+}
+
+const tailHtml = (sources, model) => sourcesHtml(sources) + (model ? `<div class="model">${t("model")}: ${esc(model)}</div>` : "");
+
+function setBusy(v) { busy = v; send.disabled = v; }
+
+async function ask(text) {
+  text = text.trim(); if (!text || busy) return;
+  const my = session;
+  placeComposer($("dockSlot"));
+  add("user").textContent = text;
+  turns.push({ role: "user", content: text }); persist();
+  q.value = ""; grow(); setBusy(true);
+  const pending = add("bot");
+  let stopStatus = showStatus(pending);
+  controller = new AbortController();
+  try {
+    const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
+                                         body: JSON.stringify({ messages: turns.map(({ role, content }) => ({ role, content })).slice(-12), company: scope, lang }) });
+    const data = await r.json();
+    stopStatus(); stopStatus = () => {};
+    if (my !== session) return;
+    if (!r.ok || data.error) {
+      pending.classList.add("err");
+      pending.innerHTML = `<p>${esc(data.answer || data.error || t("errGeneric"))}</p>`;
+      turns.pop(); persist();
+    } else {
+      turns.push({ role: "assistant", content: data.answer, sources: data.sources || [], model: data.model || null });
+      persist();  // saved before typing, so a reload mid-reveal keeps the answer
+      await typeOut(pending, data.answer, data.sources, tailHtml(data.sources, data.model));
+    }
+  } catch (e) {
+    stopStatus();
+    if (my !== session) return;
+    pending.classList.add("err"); pending.innerHTML = `<p>${t("errNet")}</p>`; turns.pop(); persist();
+  } finally {
+    if (my === session) { setBusy(false); q.focus({ preventScroll: true }); scrollDown(); }
+  }
+}
+
+function newChat() {
+  session++; controller?.abort(); setBusy(false);
+  turns = []; chatId = null; setCurrent(null); log.innerHTML = "";
+  placeComposer($("startSlot"));
+  chat.scrollTop = 0; q.focus({ preventScroll: true });
+}
+
+/* ---- saved chats: localStorage only, no server or database ---- */
+const STORE = "chats:v1", CURRENT = "chats:current", MAX_CHATS = 30, MAX_TURNS = 40;
+const drawer = $("drawer"), backdrop = $("backdrop"), chatList = $("chatList");
+
+function loadChats() {
+  try { const v = JSON.parse(localStorage.getItem(STORE) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; }
+}
+function saveChats(list) {
+  list = list.slice(0, MAX_CHATS);
+  while (true) {
+    try { localStorage.setItem(STORE, JSON.stringify(list)); return; }
+    catch (e) { if (list.length <= 1) return; list = list.slice(0, -1); }  // quota full: drop the oldest chat and retry
+  }
+}
+function setCurrent(id) { try { id ? localStorage.setItem(CURRENT, id) : localStorage.removeItem(CURRENT); } catch (e) {} }
+
+function persist() {
+  const others = loadChats().filter(c => c.id !== chatId);
+  if (!turns.length) {  // e.g. the first question failed: don't keep an empty chat
+    if (chatId) { saveChats(others); setCurrent(null); chatId = null; }
+    return;
+  }
+  chatId ||= Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const title = turns.find(x => x.role === "user").content.replace(/\s+/g, " ").slice(0, 80);
+  saveChats([{ id: chatId, title, updated: Date.now(), turns: turns.slice(-MAX_TURNS) }, ...others]);
+  setCurrent(chatId);
+}
+
+function openChat(id, instant = false) {
+  const c = loadChats().find(x => x.id === id);
+  if (!c) { setCurrent(null); return; }
+  session++; controller?.abort(); setBusy(false);
+  chatId = c.id; turns = c.turns; log.innerHTML = "";
+  placeComposer($("dockSlot"), instant);
+  for (const m of turns) {
+    if (m.role === "user") add("user").textContent = m.content;
+    else render(add("bot"), md(m.content, m.sources), hasLead(m.content), tailHtml(m.sources, m.model));
+  }
+  setCurrent(id); scrollDown();
+}
+
+function renderList() {
+  const list = loadChats(), clear = $("clearAll");
+  delete clear.dataset.confirm; clear.textContent = t("clearAll"); clear.disabled = !list.length;
+  if (!list.length) { chatList.innerHTML = `<li><p class="empty">${t("empty")}</p></li>`; return; }
+  const fmt = new Intl.DateTimeFormat(lang === "ar" ? "ar-u-nu-latn" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  chatList.innerHTML = list.map(c =>
+    `<li class="${c.id === chatId ? "current" : ""}" data-id="${esc(c.id)}">` +
+    `<button class="open" type="button"><span class="title" dir="auto">${esc(c.title)}</span><span class="when">${fmt.format(c.updated)}</span></button>` +
+    `<button class="iconbtn del" type="button" aria-label="${t("del")}">×</button></li>`).join("");
+}
+
+chatList.onclick = e => {
+  const li = e.target.closest("li[data-id]"); if (!li) return;
+  const id = li.dataset.id;
+  if (e.target.closest(".del")) {
+    saveChats(loadChats().filter(c => c.id !== id));
+    if (id === chatId) newChat();
+    renderList(); (chatList.querySelector(".open") || $("drawerClose")).focus();
+  } else if (e.target.closest(".open")) {
+    closeDrawer(); openChat(id); q.focus({ preventScroll: true });
+  }
+};
+
+$("clearAll").onclick = () => {
+  const b = $("clearAll");
+  if (!b.dataset.confirm) { b.dataset.confirm = "1"; b.textContent = t("confirmClear"); return; }
+  try { localStorage.removeItem(STORE); } catch (e) {}
+  if (chatId) newChat();
+  renderList(); $("drawerClose").focus();
+};
+
+// slide the drawer in/out from its edge (right in English, left in Arabic) and fade the backdrop; same 250ms both ways
+let drawerAnims = [];
+function slideDrawer(opening) {
+  drawerAnims.forEach(a => a.cancel());
+  if (reduceMotion() || !drawer.animate) { drawerAnims = []; return Promise.resolve(); }
+  // closing plays the exact opening animation backwards (same keyframes, curve and duration, mirrored in time)
+  const opts = { duration: 280, easing: "cubic-bezier(.2, .7, .2, 1)", fill: "forwards", direction: opening ? "normal" : "reverse" };
+  drawerAnims = [drawer.animate([{ transform: `translateX(${lang === "ar" ? "-100%" : "100%"})` }, { transform: "none" }], opts),
+                 backdrop.animate([{ opacity: 0 }, { opacity: 1 }], opts)];
+  return drawerAnims[0].finished.catch(() => {});  // rejected if cancelled by a newer open/close
+}
+function openDrawer() {
+  renderList(); backdrop.hidden = false; drawer.hidden = false; drawer.dataset.open = "1";
+  $("recentbtn").setAttribute("aria-expanded", "true");
+  slideDrawer(true);
+  (chatList.querySelector("li.current .open") || chatList.querySelector(".open") || $("drawerClose")).focus();
+}
+function closeDrawer() {
+  if (!drawer.dataset.open) return;
+  delete drawer.dataset.open;
+  $("recentbtn").setAttribute("aria-expanded", "false"); $("recentbtn").focus();
+  slideDrawer(false).then(() => {
+    if (drawer.dataset.open) return;  // reopened while sliding out
+    drawer.hidden = true; backdrop.hidden = true; drawerAnims.forEach(a => a.cancel()); drawerAnims = [];
+  });
+}
+$("recentbtn").onclick = openDrawer;
+$("drawerClose").onclick = closeDrawer;
+backdrop.onclick = closeDrawer;
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
+$("home").onclick = e => { e.preventDefault(); closeDrawer(); newChat(); };
+
+function grow() { q.style.height = "auto"; q.style.height = Math.min(q.scrollHeight, 160) + "px"; }
+
+composer.onsubmit = e => { e.preventDefault(); ask(q.value); };
+q.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); ask(q.value); } });
+q.addEventListener("input", grow);
+$("newchat").onclick = newChat;
+applyLang();
+try { const cur = localStorage.getItem(CURRENT); if (cur) openChat(cur, true); } catch (e) {}  // restore the open chat after a reload
+</script>
+</body>
+</html>

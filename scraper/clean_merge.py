@@ -61,12 +61,18 @@ def load():
     return recs
 
 
+# template-heavy pages: lines like "3", "Riyadh" or "price: 900000" repeat across
+# many of them but are real data, so the repeated-line filter must not touch them
+NO_BOILER_TYPES = {"curated", "listing", "category"}
+FACT_LINE = re.compile(r"^[A-Za-z]+: \S|^Key facts:$")
+
+
 def boilerplate_lines(recs):
     """Short lines that repeat across a large share of one source's pages."""
     per_source = defaultdict(Counter)
     pages = Counter()
     for r in recs:
-        if r["type"] == "curated":
+        if r["type"] in NO_BOILER_TYPES:
             continue
         pages[r["source"]] += 1
         for ln in set(l.strip() for l in r["content"].splitlines()):
@@ -125,9 +131,12 @@ def main():
     for src, lines in bad.items():
         print(f"Boilerplate lines removed for {src}: {len(lines)}")
     for r in kept:
-        b = bad.get(r["source"], set())
         lines = [l.strip() for l in r["content"].splitlines()]
-        r["content"] = "\n".join(l for l in lines if l and l not in b)
+        if r["type"] in NO_BOILER_TYPES:
+            r["content"] = "\n".join(l for l in lines if l)
+            continue
+        b = bad.get(r["source"], set())
+        r["content"] = "\n".join(l for l in lines if l and (l not in b or FACT_LINE.match(l)))
 
     # 3-5. cap, chunk, dedupe chunks
     OUT.parent.mkdir(parents=True, exist_ok=True)

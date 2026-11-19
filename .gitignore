@@ -5,3 +5,8 @@ data/raw_html/
 data/raw_html_rendered/
 data/raw_html_wasalt/
 *.bak
+
+.claude/
+
+__pycache__/
+*.pyc
